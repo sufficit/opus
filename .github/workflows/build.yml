@@ -1,0 +1,134 @@
+# Nome do workflow que aparecerá no GitHub Actions
+name: Build Opus for Windows and Linux
+
+# Define quando o workflow será executado
+on:
+  # Aciona o workflow em eventos de 'push' para tags (opcional, mas mantido para flexibilidade)
+  push:
+    tags:
+      - 'v*.*.*' # Exemplo: v1.0.0, v1.2.3
+
+  # Permite que você execute este workflow manualmente na aba "Actions" do GitHub
+  workflow_dispatch:
+
+# Definição dos jobs a serem executados
+jobs:
+  # Job para compilação no Windows
+  build-windows:
+    name: Build on Windows
+    # Usa a última versão do Windows Server
+    runs-on: windows-latest
+
+    steps:
+      # Passo 0: Captura a data e hora do build para usar como versão
+      - name: Get current date and time
+        id: date
+        run: |
+          # Formata a data e hora como YYYYMMDD-HHMMSS (UTC)
+          $build_version = (Get-Date -UFormat %Y%m%d-%H%M%S)
+          echo "BUILD_VERSION=$build_version" | Out-File -FilePath $env:GITHUB_ENV -Append
+        shell: powershell
+
+      # Passo 1: Faz o checkout do código do seu repositório
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive # Se houver submódulos, eles também serão clonados
+
+      # Passo 2: Configura o ambiente de build com CMake
+      # O CMake já vem pré-instalado nos runners do GitHub Actions
+      - name: Configure CMake for Windows
+        run: |
+          # Cria um diretório de build
+          mkdir build-windows
+          cd build-windows
+          # Configura o CMake.
+          # -DCMAKE_BUILD_TYPE=Release: Define o tipo de build como Release (otimizado).
+          # ..: Aponta para o diretório raiz do projeto onde está o CMakeLists.txt.
+          cmake .. -DCMAKE_BUILD_TYPE=Release -A x64
+        # shell: cmd é usado para garantir compatibilidade em ambientes Windows
+
+      # Passo 3: Compila o projeto
+      - name: Build Opus for Windows
+        run: |
+          cd build-windows
+          # Compila o projeto usando a configuração gerada pelo CMake
+          cmake --build . --config Release
+
+      # Passo 4: Compacta os artefatos de build
+      - name: Archive Windows builds
+        run: |
+          # O caminho exato dos artefatos pode variar.
+          # Ajuste conforme onde os arquivos Opus são gerados (ex: build-windows\Release\*)
+          # Este exemplo tenta copiar os arquivos gerados para uma pasta temporária e compactar.
+          # Você precisará verificar a estrutura de saída do seu build CMake para 'opusfile'.
+          mkdir windows_artifacts
+          # Usando 7-Zip (disponível no runner Windows) para criar o arquivo zip
+          7z a opus-windows-x64-${{ env.BUILD_VERSION }}.zip build-windows\Release\ # Ajustado para usar BUILD_VERSION
+        shell: powershell
+
+      # Passo 5: Faz o upload dos artefatos
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          # Nome do artefato
+          name: opus-windows-x64-${{ env.BUILD_VERSION }} # Ajustado para usar BUILD_VERSION
+          # Caminho do arquivo ou diretório a ser upado
+          path: opus-windows-x64-${{ env.BUILD_VERSION }}.zip
+
+
+  # Job para compilação no Linux
+  build-linux:
+    name: Build on Linux
+    # Usa a última versão do Ubuntu
+    runs-on: ubuntu-latest
+
+    steps:
+      # Passo 0: Captura a data e hora do build para usar como versão
+      - name: Get current date and time
+        id: date
+        run: |
+          # Formata a data e hora como YYYYMMDD-HHMMSS (UTC)
+          echo "BUILD_VERSION=$(date -u +%Y%m%d-%H%M%S)" >> "$GITHUB_ENV"
+
+      # Passo 1: Faz o checkout do código do seu repositório
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      # Passo 2: Instala ferramentas de build (CMake, make, etc.)
+      # GCC e G++ já vêm pré-instalados, mas é bom garantir o CMake e ferramentas essenciais
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake build-essential libogg-dev libflac-dev # libogg-dev e libflac-dev podem ser necessários para opusfile
+
+      # Passo 3: Configura o ambiente de build com CMake
+      - name: Configure CMake for Linux
+        run: |
+          mkdir build-linux
+          cd build-linux
+          cmake .. -DCMAKE_BUILD_TYPE=Release # Compilação Release para otimização
+
+      # Passo 4: Compila o projeto
+      - name: Build Opus for Linux
+        run: |
+          cd build-linux
+          cmake --build . --config Release # Usa 'make' por baixo dos panos
+
+      # Passo 5: Compacta os artefatos de build
+      - name: Archive Linux builds
+        run: |
+          # O caminho exato dos artefatos pode variar.
+          # Para `opusfile`, a saída geralmente está em `build-linux/Release` ou `build-linux/Debug`.
+          # Vamos tentar compactar a pasta `build-linux/Release`.
+          tar -czvf opus-linux-x64-${{ env.BUILD_VERSION }}.tar.gz -C build-linux/ Release/ # Ajustado para usar BUILD_VERSION
+
+      # Passo 6: Faz o upload dos artefatos
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: opus-linux-x64-${{ env.BUILD_VERSION }} # Ajustado para usar BUILD_VERSION
+          path: opus-linux-x64-${{ env.BUILD_VERSION }}.tar.gz
+
