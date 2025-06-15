@@ -5,12 +5,11 @@
 # creates a tag and release for each successful build on 'main'. It also still triggers on
 # manually pushed version tags. Build artifacts are named using the UTC date and time of the build.
 #
-# Action Version: 1.0.5
+# Action Version: 1.0.6
 # Last Updated: 2025-06-15
 # Description of Changes:
 #   - Updated Action Version and Last Updated.
-#   - Added a new 'build-linux-arm' job for ARM64 compilation on Ubuntu.
-#   - Updated the 'create-release' job to depend on and upload artifacts from the new ARM build.
+#   - Corrected placement of 'architecture' key for Linux ARM job to resolve workflow validation error.
 #   - Ensured all comments are in English.
 #
 # For more information on GitHub Actions, visit: https://docs.github.com/en/actions
@@ -164,11 +163,9 @@ jobs:
   # Job for Linux ARM compilation (64-bit)
   build-linux-arm:
     name: Build on Linux ARM (64-bit)
-    # Uses Ubuntu with arm64 architecture
-    runs-on:
-      group: ubuntu-latest # Specify a larger group if needed for ARM runners
-      labels: ubuntu-latest # Or a specific ARM runner label, e.g., 'self-hosted', 'linux', 'arm64'
-      architecture: arm64 # Explicitly request ARM64 architecture
+    # Uses the latest Ubuntu version for ARM64 architecture
+    runs-on: ubuntu-latest
+    architecture: arm64 # Explicitly request ARM64 architecture for the runner
 
     outputs:
       build_version: ${{ steps.date.outputs.BUILD_VERSION }} # Output the build version for other jobs
