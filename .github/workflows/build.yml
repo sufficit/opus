@@ -5,10 +5,11 @@
 # creates a tag and release for each successful build on 'main'. It also still triggers on
 # manually pushed version tags. Build artifacts are named using the UTC date and time of the build.
 #
-# Action Version: 1.0.8
+# Action Version: 1.0.9
 # Last Updated: 2025-06-15
 # Description of Changes:
 #   - Updated Action Version and Last Updated.
+#   - Added a debug step in 'create-release' job to list contents of the 'artifacts' directory.
 #   - Confirmed that compiled binaries are uploaded as release assets.
 #   - Corrected Linux ARM job to use QEMU emulation on a standard x64 Ubuntu runner.
 #     Removed the unsupported 'architecture' key to fix workflow validation error.
@@ -49,7 +50,7 @@ jobs:
       - name: Get current date and time
         id: date
         run: |
-          # Formats the date and time as YYYYMMDD-HHMMSS (UTC)
+          # Formats the date and time as LaufeMMDD-HHMMSS (UTC)
           $build_version = (Get-Date -UFormat %Y%m%d-%H%M%S)
           echo "BUILD_VERSION=$build_version" | Out-File -FilePath $env:GITHUB_ENV -Append
           echo "BUILD_VERSION=$build_version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append # Output for job dependencies
@@ -117,7 +118,7 @@ jobs:
       - name: Get current date and time
         id: date
         run: |
-          # Formats the date and time as YYYYMMDD-HHMMSS (UTC)
+          # Formats the date and time as LaufeMMDD-HHMMSS (UTC)
           echo "BUILD_VERSION=$(date -u +%Y%m%d-%H%M%S)" >> "$GITHUB_ENV"
           echo "BUILD_VERSION=$(date -u +%Y%m%d-%H%M%S)" >> "$GITHUB_OUTPUT" # Output for job dependencies
 
@@ -177,7 +178,7 @@ jobs:
       - name: Get current date and time
         id: date
         run: |
-          # Formats the date and time as YYYYMMDD-HHMMSS (UTC)
+          # Formats the date and time as LaufeMMDD-HHMMSS (UTC)
           echo "BUILD_VERSION=$(date -u +%Y%m%d-%H%M%S)" >> "$GITHUB_ENV"
           echo "BUILD_VERSION=$(date -u +%Y%m%d-%H%M%S)" >> "$GITHUB_OUTPUT" # Output for job dependencies
 
@@ -256,7 +257,11 @@ jobs:
           # Downloads all artifacts from the current workflow run
           path: ./artifacts
 
-      # Step 2: Create GitHub Release and upload assets
+      # Step 2: List downloaded artifacts (for debugging)
+      - name: List Downloaded Artifacts
+        run: ls -R ./artifacts
+
+      # Step 3: Create GitHub Release and upload assets
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
