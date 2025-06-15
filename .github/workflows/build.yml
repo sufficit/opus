@@ -5,7 +5,7 @@
 # for each successful build on 'main'. It also still triggers on manually pushed version tags.
 # Build artifacts are named using the UTC date and time of the build.
 #
-# Action Version: 1.0.3
+# Action Version: 1.0.4
 # Last Updated: 2025-06-15
 # Description of Changes:
 #   - Updated Action Version and Last Updated.
@@ -13,6 +13,7 @@
 #   - Modified 'create-release' to automatically generate a tag (e.g., 'build-YYYYMMDD-HHMMSS')
 #     and create a GitHub Release for every successful build on the 'main' branch.
 #   - Ensured all comments are in English.
+#   - Removed unsupported 'overwrite' input from 'softprops/action-gh-release' to resolve warning.
 #
 # For more information on GitHub Actions, visit: https://docs.github.com/en/actions
 #
@@ -48,7 +49,7 @@ jobs:
       - name: Get current date and time
         id: date
         run: |
-          # Formats the date and time as YYYYMMDD-HHMMSS (UTC)
+          # Formats the date and time as LaufeMMDD-HHMMSS (UTC)
           $build_version = (Get-Date -UFormat %Y%m%d-%H%M%S)
           echo "BUILD_VERSION=$build_version" | Out-File -FilePath $env:GITHUB_ENV -Append
           echo "BUILD_VERSION=$build_version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append # Output for job dependencies
@@ -116,7 +117,7 @@ jobs:
       - name: Get current date and time
         id: date
         run: |
-          # Formats the date and time as YYYYMMDD-HHMMSS (UTC)
+          # Formats the date and time as LaufeMMDD-HHMMSS (UTC)
           echo "BUILD_VERSION=$(date -u +%Y%m%d-%H%M%S)" >> "$GITHUB_ENV"
           echo "BUILD_VERSION=$(date -u +%Y%m%d-%H%M%S)" >> "$GITHUB_OUTPUT" # Output for job dependencies
 
@@ -201,10 +202,6 @@ jobs:
           # Set 'prerelease' to true if you want these auto-generated releases to be marked as pre-releases.
           # Remove or set to 'false' if you want them as full releases.
           # prerelease: true
-          # When run on 'main', if a tag already exists (e.g., from a manual tag push),
-          # this prevents trying to create it again and instead updates the existing release.
-          # If you want a new release for every push, even if it has the same tag (less common), remove this.
-          overwrite: true
         env:
           # GITHUB_TOKEN is automatically provided by GitHub Actions for authentication
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
