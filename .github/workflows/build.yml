@@ -5,11 +5,12 @@
 # creates a tag and release for each successful build on 'main'. It also still triggers on
 # manually pushed version tags. Build artifacts are named using the UTC date and time of the build.
 #
-# Action Version: 1.0.9
+# Action Version: 1.0.10
 # Last Updated: 2025-06-15
 # Description of Changes:
 #   - Updated Action Version and Last Updated.
-#   - Added a debug step in 'create-release' job to list contents of the 'artifacts' directory.
+#   - Corrected file paths in 'create-release' job's 'files' section to correctly include
+#     subdirectories created by 'actions/download-artifact', ensuring assets are uploaded.
 #   - Confirmed that compiled binaries are uploaded as release assets.
 #   - Corrected Linux ARM job to use QEMU emulation on a standard x64 Ubuntu runner.
 #     Removed the unsupported 'architecture' key to fix workflow validation error.
@@ -50,7 +51,7 @@ jobs:
       - name: Get current date and time
         id: date
         run: |
-          # Formats the date and time as LaufeMMDD-HHMMSS (UTC)
+          # Formats the date and time as YYYYMMDD-HHMMSS (UTC)
           $build_version = (Get-Date -UFormat %Y%m%d-%H%M%S)
           echo "BUILD_VERSION=$build_version" | Out-File -FilePath $env:GITHUB_ENV -Append
           echo "BUILD_VERSION=$build_version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append # Output for job dependencies
@@ -118,7 +119,7 @@ jobs:
       - name: Get current date and time
         id: date
         run: |
-          # Formats the date and time as LaufeMMDD-HHMMSS (UTC)
+          # Formats the date and time as YYYYMMDD-HHMMSS (UTC)
           echo "BUILD_VERSION=$(date -u +%Y%m%d-%H%M%S)" >> "$GITHUB_ENV"
           echo "BUILD_VERSION=$(date -u +%Y%m%d-%H%M%S)" >> "$GITHUB_OUTPUT" # Output for job dependencies
 
@@ -178,7 +179,7 @@ jobs:
       - name: Get current date and time
         id: date
         run: |
-          # Formats the date and time as LaufeMMDD-HHMMSS (UTC)
+          # Formats the date and time as YYYYMMDD-HHMMSS (UTC)
           echo "BUILD_VERSION=$(date -u +%Y%m%d-%H%M%S)" >> "$GITHUB_ENV"
           echo "BUILD_VERSION=$(date -u +%Y%m%d-%H%M%S)" >> "$GITHUB_OUTPUT" # Output for job dependencies
 
@@ -277,9 +278,9 @@ jobs:
           # Remove or set to 'false' if you want them as full releases.
           # prerelease: true
           files: |
-            ./artifacts/opus-windows-x64-${{ needs.build-windows.outputs.build_version }}.zip
-            ./artifacts/opus-linux-x64-${{ needs.build-linux.outputs.build_version }}.tar.gz
-            ./artifacts/opus-linux-arm64-${{ needs.build-linux-arm.outputs.build_version }}.tar.gz
+            ./artifacts/opus-windows-x64-${{ needs.build-windows.outputs.build_version }}/opus-windows-x64-${{ needs.build-windows.outputs.build_version }}.zip
+            ./artifacts/opus-linux-x64-${{ needs.build-linux.outputs.build_version }}/opus-linux-x64-${{ needs.build-linux.outputs.build_version }}.tar.gz
+            ./artifacts/opus-linux-arm64-${{ needs.build-linux-arm.outputs.build_version }}/opus-linux-arm64-${{ needs.build-linux-arm.outputs.build_version }}.tar.gz
         env:
           # GITHUB_TOKEN is automatically provided by GitHub Actions for authentication
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
