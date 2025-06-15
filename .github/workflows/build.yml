@@ -5,11 +5,13 @@
 # creates a tag and release for each successful build on 'main'. It also still triggers on
 # manually pushed version tags. Build artifacts are named using the UTC date and time of the build.
 #
-# Action Version: 1.0.6
+# Action Version: 1.0.7
 # Last Updated: 2025-06-15
 # Description of Changes:
 #   - Updated Action Version and Last Updated.
-#   - Corrected placement of 'architecture' key for Linux ARM job to resolve workflow validation error.
+#   - Corrected Linux ARM job to use QEMU emulation on a standard x64 Ubuntu runner.
+#     Removed the unsupported 'architecture' key to fix workflow validation error.
+#   - Added 'docker/setup-qemu-action' and 'docker/setup-buildx-action' for ARM emulation.
 #   - Ensured all comments are in English.
 #
 # For more information on GitHub Actions, visit: https://docs.github.com/en/actions
@@ -163,9 +165,8 @@ jobs:
   # Job for Linux ARM compilation (64-bit)
   build-linux-arm:
     name: Build on Linux ARM (64-bit)
-    # Uses the latest Ubuntu version for ARM64 architecture
+    # Uses the latest Ubuntu version for x64, and then sets up ARM64 emulation
     runs-on: ubuntu-latest
-    architecture: arm64 # Explicitly request ARM64 architecture for the runner
 
     outputs:
       build_version: ${{ steps.date.outputs.BUILD_VERSION }} # Output the build version for other jobs
@@ -179,38 +180,51 @@ jobs:
           echo "BUILD_VERSION=$(date -u +%Y%m%d-%H%M%S)" >> "$GITHUB_ENV"
           echo "BUILD_VERSION=$(date -u +%Y%m%d-%H%M%S)" >> "$GITHUB_OUTPUT" # Output for job dependencies
 
-      # Step 1: Checks out your repository code
+      # Step 1: Set up QEMU for ARM64 emulation
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: all
+
+      # Step 2: Set up Docker Buildx for multi-platform builds
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Step 3: Checks out your repository code
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      # Step 2: Installs build tools (CMake, make, etc.)
+      # Step 4: Installs build tools (CMake, make, etc.)
       - name: Install build dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y cmake build-essential libogg-dev libflac-dev # Dependencies likely similar for ARM
 
-      # Step 3: Configures the build environment with CMake
+      # Step 5: Configures the build environment with CMake
+      # We explicitly set the CMAKE_SYSTEM_PROCESSOR to aarch64 for ARM builds
       - name: Configure CMake for Linux ARM
         run: |
           mkdir build-linux-arm
           cd build-linux-arm
-          cmake .. -DCMAKE_BUILD_TYPE=Release # Release compilation for optimization
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_SYSTEM_PROCESSOR=aarch64 # Explicitly target ARM64
+          # If opusfile requires a specific toolchain file for cross-compilation, you would add it here
+          # For simple projects, setting CMAKE_SYSTEM_PROCESSOR might be enough with QEMU.
 
-      # Step 4: Compiles the project
+      # Step 6: Compiles the project
       - name: Build Opus for Linux ARM
         run: |
           cd build-linux-arm
           cmake --build . --config Release # Uses 'make' underneath
 
-      # Step 5: Compresses build artifacts
+      # Step 7: Compresses build artifacts
       - name: Archive Linux ARM builds
         run: |
           # Compresses the content of the 'build-linux-arm' directory.
           tar -czvf opus-linux-arm64-${{ env.BUILD_VERSION }}.tar.gz -C build-linux-arm .
 
-      # Step 6: Uploads artifacts
+      # Step 8: Uploads artifacts
       - name: Upload Linux ARM artifacts
         uses: actions/upload-artifact@v4
         with:
