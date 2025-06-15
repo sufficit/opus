@@ -4,7 +4,7 @@
 # It is triggered on pushes to the 'main' branch and when new version tags (e.g., v1.0.0) are pushed.
 # Build artifacts are named using the UTC date and time of the build.
 #
-# Action Version: 1.0.1
+# Action Version: 1.0.2
 # Last Updated: 2025-06-15
 # Description of Changes:
 #   - Added explicit Action Version and Last Updated fields in the header comments.
@@ -12,6 +12,7 @@
 #   - Maintained trigger on 'push' to 'main' branch and tags.
 #   - Maintained date/time based versioning for build artifacts.
 #   - Maintained fix for Linux tar command.
+#   - Added 'create-release' job to generate GitHub releases with compiled artifacts.
 #
 # For more information on GitHub Actions, visit: https://docs.github.com/en/actions
 #
@@ -39,6 +40,9 @@ jobs:
     # Uses the latest Windows Server version
     runs-on: windows-latest
 
+    outputs:
+      build_version: ${{ steps.date.outputs.BUILD_VERSION }} # Output the build version for other jobs
+
     steps:
       # Step 0: Capture build date and time to use as version
       - name: Get current date and time
@@ -47,6 +51,7 @@ jobs:
           # Formats the date and time as YYYYMMDD-HHMMSS (UTC)
           $build_version = (Get-Date -UFormat %Y%m%d-%H%M%S)
           echo "BUILD_VERSION=$build_version" | Out-File -FilePath $env:GITHUB_ENV -Append
+          echo "BUILD_VERSION=$build_version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append # Output for job dependencies
         shell: powershell
 
       # Step 1: Checks out your repository code
@@ -103,6 +108,9 @@ jobs:
     # Uses the latest Ubuntu version
     runs-on: ubuntu-latest
 
+    outputs:
+      build_version: ${{ steps.date.outputs.BUILD_VERSION }} # Output the build version for other jobs
+
     steps:
       # Step 0: Capture build date and time to use as version
       - name: Get current date and time
@@ -110,6 +118,7 @@ jobs:
         run: |
           # Formats the date and time as YYYYMMDD-HHMMSS (UTC)
           echo "BUILD_VERSION=$(date -u +%Y%m%d-%H%M%S)" >> "$GITHUB_ENV"
+          echo "BUILD_VERSION=$(date -u +%Y%m%d-%H%M%S)" >> "$GITHUB_OUTPUT" # Output for job dependencies
 
       # Step 1: Checks out your repository code
       - name: Checkout repository
@@ -152,3 +161,36 @@ jobs:
         with:
           name: opus-linux-x64-${{ env.BUILD_VERSION }} # Adjusted to use BUILD_VERSION
           path: opus-linux-x64-${{ env.BUILD_VERSION }}.tar.gz
+
+  # Job to create GitHub Release
+  create-release:
+    name: Create GitHub Release
+    # This job runs only if both build jobs succeed
+    needs: [build-windows, build-linux]
+    # This job should only run when a tag is pushed
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Download all build artifacts
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          # Downloads all artifacts from the current workflow run
+          path: ./artifacts
+
+      # Step 2: Create GitHub Release and upload assets
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          # Set the tag name for the release
+          tag_name: ${{ github.ref_name }} # Uses the pushed tag name (e.g., v1.0.0)
+          # Set the release name
+          name: Release ${{ github.ref_name }} Build ${{ needs.build-windows.outputs.build_version }}
+          # Path to the assets to upload. 'artifacts/*' will include all downloaded files.
+          files: |
+            ./artifacts/opus-windows-x64-${{ needs.build-windows.outputs.build_version }}.zip
+            ./artifacts/opus-linux-x64-${{ needs.build-linux.outputs.build_version }}.tar.gz
+        env:
+          # GITHUB_TOKEN is automatically provided by GitHub Actions for authentication
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
