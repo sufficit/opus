@@ -3,8 +3,10 @@ name: Build Opus for Windows and Linux
 
 # Define quando o workflow será executado
 on:
-  # Aciona o workflow em eventos de 'push' para tags (opcional, mas mantido para flexibilidade)
+  # Aciona o workflow em eventos de 'push' para a branch 'main'
   push:
+    branches:
+      - main
     tags:
       - 'v*.*.*' # Exemplo: v1.0.0, v1.2.3
 
@@ -131,4 +133,3 @@ jobs:
         with:
           name: opus-linux-x64-${{ env.BUILD_VERSION }} # Ajustado para usar BUILD_VERSION
           path: opus-linux-x64-${{ env.BUILD_VERSION }}.tar.gz
-
