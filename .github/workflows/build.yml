@@ -1,18 +1,18 @@
 # GitHub Actions Workflow: Opus Build for Windows and Linux
 #
 # This workflow automates the compilation of the Opus project for Windows (x64) and Linux (x64).
-# It is triggered on pushes to the 'main' branch and when new version tags (e.g., v1.0.0) are pushed.
+# It is triggered on pushes to the 'main' branch, and now automatically creates a tag and release
+# for each successful build on 'main'. It also still triggers on manually pushed version tags.
 # Build artifacts are named using the UTC date and time of the build.
 #
-# Action Version: 1.0.2
+# Action Version: 1.0.3
 # Last Updated: 2025-06-15
 # Description of Changes:
-#   - Added explicit Action Version and Last Updated fields in the header comments.
+#   - Updated Action Version and Last Updated.
+#   - Removed the 'if' condition on 'create-release' job to allow it to run on 'main' pushes.
+#   - Modified 'create-release' to automatically generate a tag (e.g., 'build-YYYYMMDD-HHMMSS')
+#     and create a GitHub Release for every successful build on the 'main' branch.
 #   - Ensured all comments are in English.
-#   - Maintained trigger on 'push' to 'main' branch and tags.
-#   - Maintained date/time based versioning for build artifacts.
-#   - Maintained fix for Linux tar command.
-#   - Added 'create-release' job to generate GitHub releases with compiled artifacts.
 #
 # For more information on GitHub Actions, visit: https://docs.github.com/en/actions
 #
@@ -27,7 +27,7 @@ on:
     branches:
       - main
     tags:
-      - 'v*.*.*' # Example: v1.0.0, v1.2.3
+      - 'v*.*.*' # Example: v1.0.0, v1.2.3 (still supported for manual tagging)
 
   # Allows you to manually run this workflow from the GitHub "Actions" tab
   workflow_dispatch:
@@ -167,11 +167,18 @@ jobs:
     name: Create GitHub Release
     # This job runs only if both build jobs succeed
     needs: [build-windows, build-linux]
-    # This job should only run when a tag is pushed
-    if: startsWith(github.ref, 'refs/tags/')
+    # Removed the 'if' condition, so this job now runs for every successful build on 'main'.
     runs-on: ubuntu-latest
 
     steps:
+      # Step 0: Set the tag name based on the build version
+      # We need to get the BUILD_VERSION from one of the previous jobs.
+      # Since both jobs have the same BUILD_VERSION, we can pick one, e.g., build-windows.
+      - name: Set Release Tag Name
+        id: set_tag
+        run: |
+          echo "RELEASE_TAG=build-${{ needs.build-windows.outputs.build_version }}" >> $GITHUB_ENV
+
       # Step 1: Download all build artifacts
       - name: Download all build artifacts
         uses: actions/download-artifact@v4
@@ -183,14 +190,21 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          # Set the tag name for the release
-          tag_name: ${{ github.ref_name }} # Uses the pushed tag name (e.g., v1.0.0)
+          # Set the tag name for the release. This action will create the tag if it doesn't exist.
+          tag_name: ${{ env.RELEASE_TAG }}
           # Set the release name
-          name: Release ${{ github.ref_name }} Build ${{ needs.build-windows.outputs.build_version }}
-          # Path to the assets to upload. 'artifacts/*' will include all downloaded files.
-          files: |
-            ./artifacts/opus-windows-x64-${{ needs.build-windows.outputs.build_version }}.zip
-            ./artifacts/opus-linux-x64-${{ needs.build-linux.outputs.build_version }}.tar.gz
+          name: Automated Build Release ${{ env.RELEASE_TAG }}
+          # Provide a body for the release notes
+          body: |
+            Automated build for branch `main`.
+            Build Date (UTC): `${{ needs.build-windows.outputs.build_version }}`
+          # Set 'prerelease' to true if you want these auto-generated releases to be marked as pre-releases.
+          # Remove or set to 'false' if you want them as full releases.
+          # prerelease: true
+          # When run on 'main', if a tag already exists (e.g., from a manual tag push),
+          # this prevents trying to create it again and instead updates the existing release.
+          # If you want a new release for every push, even if it has the same tag (less common), remove this.
+          overwrite: true
         env:
           # GITHUB_TOKEN is automatically provided by GitHub Actions for authentication
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
