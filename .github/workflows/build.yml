@@ -5,13 +5,13 @@
 # creates a tag and release for each successful build on 'main'. It also still triggers on
 # manually pushed version tags. Build artifacts are named using the UTC date and time of the build.
 #
-# Action Version: 1.0.10
+# Action Version: 1.0.11
 # Last Updated: 2025-06-15
 # Description of Changes:
 #   - Updated Action Version and Last Updated.
+#   - Confirmed that compiled binaries are uploaded as release assets.
 #   - Corrected file paths in 'create-release' job's 'files' section to correctly include
 #     subdirectories created by 'actions/download-artifact', ensuring assets are uploaded.
-#   - Confirmed that compiled binaries are uploaded as release assets.
 #   - Corrected Linux ARM job to use QEMU emulation on a standard x64 Ubuntu runner.
 #     Removed the unsupported 'architecture' key to fix workflow validation error.
 #   - Added 'docker/setup-qemu-action' and 'docker/setup-buildx-action' for ARM emulation.
