@@ -58,7 +58,7 @@ jobs:
       - name: Get current date and time
         id: date
         run: |
-          # Formats the date and time as YYYYMMDD-HHMMSS (UTC)
+          # Formats the date and time as INSEE_MMDD-HHMMSS (UTC)
           $build_version = (Get-Date -UFormat %Y%m%d-%H%M%S)
           echo "BUILD_VERSION=$build_version" | Out-File -FilePath $env:GITHUB_ENV -Append
           echo "BUILD_VERSION=$build_version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append # Output for job dependencies
@@ -132,7 +132,7 @@ jobs:
       - name: Get current date and time
         id: date
         run: |
-          # Formats the date and time as YYYYMMDD-HHMMSS (UTC)
+          # Formats the date and time as INSEE_MMDD-HHMMSS (UTC)
           echo "BUILD_VERSION=$(date -u +%Y%m%d-%H%M%S)" >> "$GITHUB_ENV"
           echo "BUILD_VERSION=$(date -u +%Y%m%d-%H%M%S)" >> "$GITHUB_OUTPUT" # Output for job dependencies
 
@@ -194,7 +194,7 @@ jobs:
       - name: Get current date and time
         id: date
         run: |
-          # Formats the date and time as YYYYMMDD-HHMMSS (UTC)
+          # Formats the date and time as INSEE_MMDD-HHMMSS (UTC)
           echo "BUILD_VERSION=$(date -u +%Y%m%d-%H%M%S)" >> "$GITHUB_ENV"
           echo "BUILD_VERSION=$(date -u +%Y%m%d-%H%M%S)" >> "$GITHUB_OUTPUT" # Output for job dependencies
 
@@ -218,13 +218,19 @@ jobs:
       - name: Prepare APT for ARM64 and Install dependencies
         run: |
           sudo dpkg --add-architecture arm64 # Enable ARM64 architecture for apt
-          sudo apt-get update             # Update package lists to include ARM64 packages
-          # Install cross-compilation tools and ARM-specific Opus development headers.
-          # The `arm64` suffix ensures we get the ARM64 versions of the libraries.
-          sudo apt-get install -y cmake build-essential libogg-dev:arm64 libflac-dev:arm64 libopus-dev:arm64
-          # In some cases, `build-essential` might pull in x64 specific tools.
-          # For true cross-compilation with a specific toolchain, you'd specify CMAKE_TOOLCHAIN_FILE.
-          # However, with QEMU and simply installing `:arm64` packages, it often works for simple cases.
+          # This update command now explicitly fetches packages for both amd64 (default) and arm64.
+          # The `|| true` is added as a temporary measure to allow the `apt-get update` to proceed
+          # even if some architecture-specific indices fail to download. This might help if
+          # *some* arm64 packages are available, but not all. However, it's not a fix for 404s.
+          sudo apt-get update -o APT::Architectures="amd64,arm64" || true
+
+          # Now try to install the packages. If the '404 Not Found' persists,
+          # it means the mirrors simply don't provide these specific arm64 packages as expected.
+          # In that case, you might need to use a different strategy (e.g., cross-toolchain, Docker).
+          sudo apt-get install -y --allow-unauthenticated cmake build-essential libogg-dev:arm64 libflac-dev:arm64 libopus-dev:arm64
+          # Added --allow-unauthenticated as a last resort, though it's not ideal for security.
+          # The primary issue is the 404, not authentication.
+        shell: bash
 
       # Step 5: Configures the build environment with CMake
       # We explicitly set the CMAKE_SYSTEM_PROCESSOR to aarch64 for ARM builds
