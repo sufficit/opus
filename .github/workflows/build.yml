@@ -5,8 +5,8 @@
 # creates a tag and release for each successful build on 'main'. It also still triggers on
 # manually pushed version tags. Build artifacts are named using the UTC date and time of the build.
 #
-# Version: 1.0.22
-# Last Updated: 2025-06-16 13:25 GMT-3
+# Version: 1.0.23
+# Last Updated: 2025-06-16 13:28 GMT-3
 #
 # Description of Changes:
 #   - Updated Action Version and Last Updated.
@@ -29,7 +29,7 @@
 #     to be moved and archived successfully.
 #   - Added inclusion of .h headers in build outputs:
 #     - For Linux/ARM: Copies from `/usr/include/opus/` (system installation path).
-#     - For Windows: Corrected header path and made the `Test-Path` more robust using `Join-Path` and `pwsh`.
+#     - For Windows: Corrected header path to 'include' (from repository root) based on diagnostic output.
 #   - All comments in the code are now in English.
 #
 # For more information on GitHub Actions, visit: https://docs.github.com/en/actions
@@ -108,9 +108,9 @@ jobs:
       - name: Archive Windows builds
         run: |
           # Define the path to the Opus headers relative to the repository root
-          # The checkout action ensures the repository is cloned to the current working directory.
+          # Based on diagnostic output, headers are directly in 'include' directory at repo root.
           $repo_root = $env:GITHUB_WORKSPACE # This is the path to the root of your checked-out repository
-          $opus_include_src_path = Join-Path $repo_root "include\opus" 
+          $opus_include_src_path = Join-Path $repo_root "include" # Corrected path
           
           # Check if the headers directory exists
           if (-not (Test-Path $opus_include_src_path)) {
@@ -124,6 +124,7 @@ jobs:
           Copy-Item -Path "build-windows\Release\*" -Destination "dist_windows\bin\" -Recurse -Force
 
           # Copies Opus headers from the local repository
+          # The destination path is now 'dist_windows\include\opus' to maintain standard SDK structure
           mkdir dist_windows\include
           mkdir dist_windows\include\opus
           Copy-Item -Path "$opus_include_src_path\*" -Destination "dist_windows\include\opus\" -Recurse -Force
