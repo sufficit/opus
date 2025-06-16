@@ -5,8 +5,8 @@
 # creates a tag and release for each successful build on 'main'. It also still triggers on
 # manually pushed version tags. Build artifacts are named using the UTC date and time of the build.
 #
-# Version: 1.0.18
-# Last Updated: 2025-06-16 13:13 GMT-3
+# Version: 1.0.20
+# Last Updated: 2025-06-16 13:18 GMT-3
 #
 # Description of Changes:
 #   - Updated Action Version and Last Updated.
@@ -29,7 +29,7 @@
 #     to be moved and archived successfully.
 #   - Added inclusion of .h headers in build outputs:
 #     - For Linux/ARM: Copies from `/usr/include/opus/` (system installation path).
-#     - For Windows: Updated strategy to use headers directly from the forked repository's 'include/opus' path.
+#     - For Windows: Corrected strategy to use headers directly from the forked repository's 'include/opus' path (based on provided screenshot).
 #   - All comments in the code are now in English.
 #
 # For more information on GitHub Actions, visit: https://docs.github.com/en/actions
@@ -66,7 +66,7 @@ jobs:
       - name: Get current date and time
         id: date
         run: |
-          # Formats the date and time as YYYYMMDD-HHMMSS (UTC)
+          # Formats the date and time as INSEE_MMDD-HHMMSS (UTC)
           $build_version = (Get-Date -UFormat %Y%m%d-%H%M%S)
           echo "BUILD_VERSION=$build_version" | Out-File -FilePath $env:GITHUB_ENV -Append
           echo "BUILD_VERSION=$build_version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append # Output for job dependencies
@@ -102,7 +102,7 @@ jobs:
       - name: Archive Windows builds
         run: |
           # Define the path to the Opus headers within the checked-out repository
-          $opus_include_src_path = "include\opus"
+          $opus_include_src_path = "include\opus" # Corrected path based on screenshot (from repository root)
           
           # Check if the headers directory exists
           if (-not (Test-Path $opus_include_src_path)) {
@@ -148,7 +148,7 @@ jobs:
       - name: Get current date and time
         id: date
         run: |
-          # Formats the date and time as YYYYMMDD-HHMMSS (UTC)
+          # Formats the date and time as INSEE_MMDD-HHMMSS (UTC)
           echo "BUILD_VERSION=$(date -u +%Y%m%d-%H%M%S)" >> "$GITHUB_ENV"
           echo "BUILD_VERSION=$(date -u +%Y%m%d-%H%M%S)" >> "$GITHUB_OUTPUT" # Output for job dependencies
 
@@ -221,7 +221,7 @@ jobs:
       - name: Get current date and time
         id: date
         run: |
-          # Formats the date and time as YYYYMMDD-HHMMSS (UTC)
+          # Formats the date and time as INSEE_MMDD-HHMMSS (UTC)
           echo "BUILD_VERSION=$(date -u +%Y%m%d-%H%M%S)" >> "$GITHUB_ENV"
           echo "BUILD_VERSION=$(date -u +%Y%m%d-%H%M%S)" >> "$GITHUB_OUTPUT" # Output for job dependencies
 
