@@ -26,7 +26,7 @@
 #   - **FIXED Permission Denied Error in ARM build:** Added `chown` command inside Docker
 #     container to set ownership of generated files to the host user, allowing artifacts
 #     to be moved and archived successfully.
-#   - Adicionado a inclusão dos cabeçalhos .h na saída dos builds.
+#   - Adicionado a inclusão dos cabeçalhos .h na saída dos builds, corrigindo o caminho para 'src/include/opus'.
 #
 # For more information on GitHub Actions, visit: https://docs.github.com/en/actions
 #
@@ -102,10 +102,10 @@ jobs:
           mkdir dist_windows\bin
           Copy-Item -Path "build-windows\Release\*" -Destination "dist_windows\bin\" -Recurse -Force
 
-          # Copia os cabeçalhos Opus do diretório 'include/opus' na raiz do repositório
+          # Copia os cabeçalhos Opus do diretório 'src\include\opus' na raiz do repositório
           mkdir dist_windows\include
           mkdir dist_windows\include\opus
-          Copy-Item -Path "include\opus\*" -Destination "dist_windows\include\opus\" -Recurse -Force
+          Copy-Item -Path "src\include\opus\*" -Destination "dist_windows\include\opus\" -Recurse -Force
 
           # Usa 7-Zip para criar o arquivo zip com os binários e os cabeçalhos
           7z a opus-windows-x64-${{ env.BUILD_VERSION }}.zip dist_windows\*
@@ -178,8 +178,8 @@ jobs:
           # Copia os artefatos compilados (assumindo que o output está diretamente em build-linux)
           cp -r build-linux/* dist_linux/bin/
 
-          # Copia os cabeçalhos Opus do diretório 'include/opus' na raiz do repositório
-          cp -r include/opus/* dist_linux/include/opus/
+          # Copia os cabeçalhos Opus do diretório 'src/include/opus' na raiz do repositório
+          cp -r src/include/opus/* dist_linux/include/opus/
 
           # Comprime o conteúdo do diretório 'dist_linux'.
           # O '-C dist_linux' muda para o diretório antes de adicionar '.' (conteúdo atual).
@@ -289,8 +289,8 @@ jobs:
           # Copia os artefatos compilados
           cp -r build-linux-arm/* dist_linux_arm/bin/
 
-          # Copia os cabeçalhos Opus do diretório 'include/opus' na raiz do repositório
-          cp -r include/opus/* dist_linux_arm/include/opus/
+          # Copia os cabeçalhos Opus do diretório 'src/include/opus' na raiz do repositório
+          cp -r src/include/opus/* dist_linux_arm/include/opus/
 
           # Comprime o conteúdo do diretório 'dist_linux_arm'.
           tar -czvf opus-linux-arm64-${{ env.BUILD_VERSION }}.tar.gz -C dist_linux_arm .
