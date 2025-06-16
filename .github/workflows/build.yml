@@ -5,8 +5,8 @@
 # creates a tag and release for each successful build on 'main'. It also still triggers on
 # manually pushed version tags. Build artifacts are named using the UTC date and time of the build.
 #
-# Version: 1.0.23
-# Last Updated: 2025-06-16 13:28 GMT-3
+# Version: 1.0.25
+# Last Updated: 2025-06-16 13:35 GMT-3
 #
 # Description of Changes:
 #   - Updated Action Version and Last Updated.
@@ -28,9 +28,11 @@
 #     container to set ownership of generated files to the host user, allowing artifacts
 #     to be moved and archived successfully.
 #   - Added inclusion of .h headers in build outputs:
-#     - For Linux/ARM: Copies from `/usr/include/opus/` (system installation path).
+#     - For Linux: Copies from `/usr/include/opus/` (system installation path).
 #     - For Windows: Corrected header path to 'include' (from repository root) based on diagnostic output.
+#     - For ARM64: Corrected header path to 'include' (from repository root) within the Docker container.
 #   - All comments in the code are now in English.
+#   - Removed the diagnostic step for listing repository contents in Windows build as the path has been confirmed.
 #
 # For more information on GitHub Actions, visit: https://docs.github.com/en/actions
 #
@@ -78,12 +80,6 @@ jobs:
         with:
           submodules: recursive # If there are submodules, they will also be cloned
 
-      # DIAGNOSTIC STEP: List repository contents to find the correct header path
-      - name: List repository contents (for debugging Opus headers)
-        run: |
-          Get-ChildItem -Path . -Recurse -Depth 3 | Select-Object FullName, Attributes, Mode | Format-Table -Wrap
-        shell: powershell
-
       # Step 2: Configure the build environment with CMake
       # CMake is pre-installed on GitHub Actions runners
       - name: Configure CMake for Windows
@@ -114,7 +110,7 @@ jobs:
           
           # Check if the headers directory exists
           if (-not (Test-Path $opus_include_src_path)) {
-            Write-Error "Opus headers directory '$opus_include_src_path' not found in the repository. Please verify the repository structure using the 'List repository contents' step output."
+            Write-Error "Opus headers directory '$opus_include_src_path' not found in the repository. Please verify the repository structure."
             exit 1
           }
 
@@ -311,8 +307,10 @@ jobs:
           # Copies compiled artifacts
           cp -r build-linux-arm/* dist_linux_arm/bin/
 
-          # Copies Opus headers from the system installation directory
-          cp -r /usr/include/opus/* dist_linux_arm/include/opus/
+          # Copies Opus headers from the local repository's 'include' directory
+          # The current working directory inside the docker container is /src, which maps to ${{ github.workspace }}
+          # So, 'include/*' refers to /src/include/*
+          cp -r include/* dist_linux_arm/include/opus/
 
           # Compresses the content of the 'dist_linux_arm' directory.
           # The '-C dist_linux_arm' changes to the directory before adding '.' (current content).
