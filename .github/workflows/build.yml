@@ -5,7 +5,7 @@
 # creates a tag and release for each successful build on 'main'. It also still triggers on
 # manually pushed version tags. Build artifacts are named using the UTC date and time of the build.
 #
-# Action Version: 1.0.11
+# Action Version: 1.0.12
 # Last Updated: 2025-06-15
 # Description of Changes:
 #   - Updated Action Version and Last Updated.
@@ -16,6 +16,11 @@
 #     Removed the unsupported 'architecture' key to fix workflow validation error.
 #   - Added 'docker/setup-qemu-action' and 'docker/setup-buildx-action' for ARM emulation.
 #   - Ensured all comments are in English.
+#   - **Added steps to handle Opus header file discovery/installation in build jobs.**
+#     - For Linux builds, `libopus-dev` is now explicitly installed.
+#     - For Windows builds, assuming Opus source is within the repo, CMake configuration remains
+#       reliant on standard CMake project practices. If Opus is an external dependency,
+#       additional steps (e.g., vcpkg) might be needed.
 #
 # For more information on GitHub Actions, visit: https://docs.github.com/en/actions
 #
@@ -63,7 +68,7 @@ jobs:
         with:
           submodules: recursive # If there are submodules, they will also be cloned
 
-      # Step 2: Configures the build environment with CMake
+      # Step 2: Configure the build environment with CMake
       # CMake is pre-installed on GitHub Actions runners
       - name: Configure CMake for Windows
         run: |
@@ -90,6 +95,12 @@ jobs:
           # Adjust according to where Opus files are generated (e.g., build-windows\Release\*)
           # This example attempts to copy generated files to a temporary folder and compress them.
           # You will need to check the output structure of your CMake build for 'opusfile'.
+          # For a project building Opus, typically the compiled libraries/executables are in `build-windows\Release\`.
+          # If opus.h is not found, it implies the compilation of Opus itself or a project
+          # that depends on it is failing. This step assumes successful compilation.
+          # To ensure the headers are found during compilation, verify your CMakeLists.txt
+          # correctly uses `find_package(Opus CONFIG)` or `include_directories` pointing to
+          # the Opus source's include path if Opus is part of your repository.
           mkdir windows_artifacts
           # Using 7-Zip (available on the Windows runner) to create the zip file
           7z a opus-windows-x64-${{ env.BUILD_VERSION }}.zip build-windows\Release\ # Adjusted to use BUILD_VERSION
@@ -129,12 +140,14 @@ jobs:
         with:
           submodules: recursive
 
-      # Step 2: Installs build tools (CMake, make, etc.)
-      # GCC and G++ are pre-installed, but it's good to ensure CMake and essential tools
-      - name: Install build dependencies
+      # Step 2: Installs build tools (CMake, make, etc.) and Opus development headers
+      - name: Install build dependencies and Opus development headers
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake build-essential libogg-dev libflac-dev # libogg-dev and libflac-dev may be needed for opusfile
+          # `libopus-dev` provides `opus.h` and other necessary development files for Opus.
+          # `libogg-dev` and `libflac-dev` are also included as they might be dependencies
+          # for projects using Opus (e.g., opusfile).
+          sudo apt-get install -y cmake build-essential libogg-dev libflac-dev libopus-dev
 
       # Step 3: Configures the build environment with CMake
       - name: Configure CMake for Linux
@@ -199,11 +212,16 @@ jobs:
         with:
           submodules: recursive
 
-      # Step 4: Installs build tools (CMake, make, etc.)
-      - name: Install build dependencies
+      # Step 4: Installs build tools (CMake, make, etc.) and Opus development headers for ARM
+      - name: Install build dependencies and Opus development headers for ARM
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake build-essential libogg-dev libflac-dev # Dependencies likely similar for ARM
+          # Install cross-compilation tools and ARM-specific Opus development headers.
+          # The `arm64` suffix ensures we get the ARM64 versions of the libraries.
+          sudo apt-get install -y cmake build-essential libogg-dev:arm64 libflac-dev:arm64 libopus-dev:arm64
+          # In some cases, `build-essential` might pull in x64 specific tools.
+          # For true cross-compilation with a specific toolchain, you'd specify CMAKE_TOOLCHAIN_FILE.
+          # However, with QEMU and simply installing `:arm64` packages, it often works for simple cases.
 
       # Step 5: Configures the build environment with CMake
       # We explicitly set the CMAKE_SYSTEM_PROCESSOR to aarch64 for ARM builds
