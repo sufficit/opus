@@ -5,7 +5,7 @@
 # creates a tag and release for each successful build on 'main'. It also still triggers on
 # manually pushed version tags. Build artifacts are named using the UTC date and time of the build.
 #
-# Action Version: 1.0.14
+# Action Version: 1.0.15
 # Last Updated: 2025-06-15
 # Description of Changes:
 #   - Updated Action Version and Last Updated.
@@ -21,8 +21,11 @@
 #     - For Windows builds, assuming Opus source is within the repo, CMake configuration remains
 #       reliant on standard CMake project practices. If Opus is an external dependency,
 #       additional steps (e.g., vcpkg) might be needed.
-#   - **CRITICAL FIX for ARM build**: Changed ARM build to use a multi-architecture Docker
+#   - CRITICAL FIX for ARM build: Changed ARM build to use a multi-architecture Docker
 #     image for cross-compilation, bypassing apt-get package availability issues.
+#   - **FIXED Permission Denied Error in ARM build:** Added `chown` command inside Docker
+#     container to set ownership of generated files to the host user, allowing artifacts
+#     to be moved and archived successfully.
 #
 # For more information on GitHub Actions, visit: https://docs.github.com/en/actions
 #
@@ -217,7 +220,7 @@ jobs:
       # Step 4: Build Opus for ARM inside a Docker container
       # This replaces the `apt-get` installation and direct CMake/make steps for ARM.
       # We use a multi-arch compatible Ubuntu image with build tools.
-      # IMPORTANT: You might need to find a more specific cross-compilation image if
+      # IMPORTANT: You might need to find a more specific cross-compiler image if
       # this base Ubuntu image doesn't have the required ARM toolchain or specific libs.
       - name: Build Opus for Linux ARM using Docker
         run: |
@@ -252,6 +255,10 @@ jobs:
 
               echo 'Compiling Opus for Linux ARM...'
               cmake --build . --config Release
+
+              # Change ownership of the build artifacts to the host user
+              # This is crucial for the host (GitHub Actions runner) to be able to move/archive them.
+              chown -R $(id -u):$(id -g) /src/build-linux-arm_docker
             "
           # Move compiled artifacts from the Docker build directory to the host build directory
           # Adjust this path based on where your compiled binaries are located within the Docker container's build dir
