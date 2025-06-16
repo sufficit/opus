@@ -5,7 +5,7 @@
 # creates a tag and release for each successful build on 'main'. It also still triggers on
 # manually pushed version tags. Build artifacts are named using the UTC date and time of the build.
 #
-# Action Version: 1.0.13
+# Action Version: 1.0.14
 # Last Updated: 2025-06-15
 # Description of Changes:
 #   - Updated Action Version and Last Updated.
@@ -21,8 +21,8 @@
 #     - For Windows builds, assuming Opus source is within the repo, CMake configuration remains
 #       reliant on standard CMake project practices. If Opus is an external dependency,
 #       additional steps (e.g., vcpkg) might be needed.
-#   - **CRITICAL FIX for ARM build**: Added `dpkg --add-architecture arm64` and an additional
-#     `sudo apt-get update` step to allow `apt` to find `arm64` specific packages for cross-compilation.
+#   - **CRITICAL FIX for ARM build**: Changed ARM build to use a multi-architecture Docker
+#     image for cross-compilation, bypassing apt-get package availability issues.
 #
 # For more information on GitHub Actions, visit: https://docs.github.com/en/actions
 #
@@ -214,47 +214,59 @@ jobs:
         with:
           submodules: recursive
 
-      # Step 4: Prepare APT for ARM64 packages and install build tools/dependencies
-      - name: Prepare APT for ARM64 and Install dependencies
+      # Step 4: Build Opus for ARM inside a Docker container
+      # This replaces the `apt-get` installation and direct CMake/make steps for ARM.
+      # We use a multi-arch compatible Ubuntu image with build tools.
+      # IMPORTANT: You might need to find a more specific cross-compilation image if
+      # this base Ubuntu image doesn't have the required ARM toolchain or specific libs.
+      - name: Build Opus for Linux ARM using Docker
         run: |
-          sudo dpkg --add-architecture arm64 # Enable ARM64 architecture for apt
-          # This update command now explicitly fetches packages for both amd64 (default) and arm64.
-          # The `|| true` is added as a temporary measure to allow the `apt-get update` to proceed
-          # even if some architecture-specific indices fail to download. This might help if
-          # *some* arm64 packages are available, but not all. However, it's not a fix for 404s.
-          sudo apt-get update -o APT::Architectures="amd64,arm64" || true
+          # Define the target architecture and the Docker image to use
+          TARGET_ARCH="arm64"
+          DOCKER_IMAGE="ubuntu:noble" # Using Ubuntu Noble, you might need a more specialized cross-compiler image
 
-          # Now try to install the packages. If the '404 Not Found' persists,
-          # it means the mirrors simply don't provide these specific arm64 packages as expected.
-          # In that case, you might need to use a different strategy (e.g., cross-toolchain, Docker).
-          sudo apt-get install -y --allow-unauthenticated cmake build-essential libogg-dev:arm64 libflac-dev:arm64 libopus-dev:arm64
-          # Added --allow-unauthenticated as a last resort, though it's not ideal for security.
-          # The primary issue is the 404, not authentication.
+          # Create the build directory on the host to store artifacts
+          mkdir build-linux-arm
+
+          # Run the build commands inside the Docker container
+          docker run --rm \
+            --platform linux/${TARGET_ARCH} \
+            -v ${{ github.workspace }}:/src \
+            -w /src \
+            ${DOCKER_IMAGE} \
+            /bin/bash -c "
+              set -e # Exit immediately if a command exits with a non-zero status.
+
+              echo 'Installing build dependencies inside Docker for ARM...'
+              apt-get update && apt-get install -y --no-install-recommends \
+                cmake \
+                build-essential \
+                libogg-dev \
+                libflac-dev \
+                libopus-dev # These packages should now be available for arm64 within the arm64 context of the container
+
+              echo 'Configuring CMake for Linux ARM...'
+              mkdir /src/build-linux-arm_docker && \
+              cd /src/build-linux-arm_docker && \
+              cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_SYSTEM_PROCESSOR=${TARGET_ARCH}
+
+              echo 'Compiling Opus for Linux ARM...'
+              cmake --build . --config Release
+            "
+          # Move compiled artifacts from the Docker build directory to the host build directory
+          # Adjust this path based on where your compiled binaries are located within the Docker container's build dir
+          # For a standard CMake build, binaries are usually in build-dir/Release/ or build-dir/Debug/
+          # Copy the entire build-linux-arm_docker contents for archiving
+          mv build-linux-arm_docker/* build-linux-arm/
         shell: bash
 
-      # Step 5: Configures the build environment with CMake
-      # We explicitly set the CMAKE_SYSTEM_PROCESSOR to aarch64 for ARM builds
-      - name: Configure CMake for Linux ARM
-        run: |
-          mkdir build-linux-arm
-          cd build-linux-arm
-          cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_SYSTEM_PROCESSOR=aarch64 # Explicitly target ARM64
-          # If opusfile requires a specific toolchain file for cross-compilation, you would add it here
-          # For simple projects, setting CMAKE_SYSTEM_PROCESSOR might be enough with QEMU.
-
-      # Step 6: Compiles the project
-      - name: Build Opus for Linux ARM
-        run: |
-          cd build-linux-arm
-          cmake --build . --config Release # Uses 'make' underneath
-
-      # Step 7: Compresses build artifacts
+      # Step 5: Compresses build artifacts
       - name: Archive Linux ARM builds
         run: |
           # Compresses the content of the 'build-linux-arm' directory.
           tar -czvf opus-linux-arm64-${{ env.BUILD_VERSION }}.tar.gz -C build-linux-arm .
 
-      # Step 8: Uploads artifacts
+      # Step 6: Uploads artifacts
       - name: Upload Linux ARM artifacts
         uses: actions/upload-artifact@v4
         with:
