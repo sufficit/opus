@@ -5,8 +5,8 @@
 # creates a tag and release for each successful build on 'main'. It also still triggers on
 # manually pushed version tags. Build artifacts are named using the UTC date and time of the build.
 #
-# Version: 1.0.20
-# Last Updated: 2025-06-16 13:18 GMT-3
+# Version: 1.0.21
+# Last Updated: 2025-06-16 13:22 GMT-3
 #
 # Description of Changes:
 #   - Updated Action Version and Last Updated.
@@ -29,7 +29,7 @@
 #     to be moved and archived successfully.
 #   - Added inclusion of .h headers in build outputs:
 #     - For Linux/ARM: Copies from `/usr/include/opus/` (system installation path).
-#     - For Windows: Corrected strategy to use headers directly from the forked repository's 'include/opus' path (based on provided screenshot).
+#     - For Windows: Added a diagnostic step to list repository contents to verify header path.
 #   - All comments in the code are now in English.
 #
 # For more information on GitHub Actions, visit: https://docs.github.com/en/actions
@@ -78,6 +78,12 @@ jobs:
         with:
           submodules: recursive # If there are submodules, they will also be cloned
 
+      # DIAGNOSTIC STEP: List repository contents to find the correct header path
+      - name: List repository contents (for debugging Opus headers)
+        run: |
+          Get-ChildItem -Path . -Recurse -Depth 3 | Select-Object FullName, Attributes, Mode | Format-Table -Wrap
+        shell: powershell
+
       # Step 2: Configure the build environment with CMake
       # CMake is pre-installed on GitHub Actions runners
       - name: Configure CMake for Windows
@@ -102,11 +108,13 @@ jobs:
       - name: Archive Windows builds
         run: |
           # Define the path to the Opus headers within the checked-out repository
-          $opus_include_src_path = "include\opus" # Corrected path based on screenshot (from repository root)
+          # We are setting it back to 'include\opus' based on the original screenshot provided.
+          # The diagnostic step above should help confirm this or reveal the actual path.
+          $opus_include_src_path = "include\opus" 
           
           # Check if the headers directory exists
           if (-not (Test-Path $opus_include_src_path)) {
-            Write-Error "Opus headers directory '$opus_include_src_path' not found in the repository. Please verify the repository structure."
+            Write-Error "Opus headers directory '$opus_include_src_path' not found in the repository. Please verify the repository structure using the 'List repository contents' step output."
             exit 1
           }
 
