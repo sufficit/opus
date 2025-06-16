@@ -5,7 +5,7 @@
 # creates a tag and release for each successful build on 'main'. It also still triggers on
 # manually pushed version tags. Build artifacts are named using the UTC date and time of the build.
 #
-# Version: 1.0.15
+# Version: 1.0.16
 # Last Updated: 2025-06-16 13:03 GMT-3
 #
 # Description of Changes:
@@ -102,22 +102,31 @@ jobs:
       # NEW STEP: Download Opus SDK for Headers (Windows)
       - name: Download Opus SDK for Headers (Windows)
         run: |
-          # Using a more recent version (1.5.2) and a more reliable .zip link
-          $opus_sdk_url = "https://ftp.osuosl.org/pub/xiph/releases/opus/opus-1.5.2.zip"
-          $output_dir = "opus_sdk"
+          # Using a reliable opus-tools release which includes headers
+          # Source: https://github.com/Chocobo1/opus-tools_win32-build/releases
+          $opus_tools_url = "https://github.com/Chocobo1/opus-tools_win32-build/releases/download/2024.12.03/opus-tools.zip" # Using latest stable release
+          $output_dir = "opus_tools_sdk"
           New-Item -ItemType Directory -Path $output_dir
-          Invoke-WebRequest -Uri $opus_sdk_url -OutFile "$output_dir\opus.zip"
-          Expand-Archive -Path "$output_dir\opus.zip" -DestinationPath "$output_dir" -Force
+          Invoke-WebRequest -Uri $opus_tools_url -OutFile "$output_dir\opus-tools.zip"
+          Expand-Archive -Path "$output_dir\opus-tools.zip" -DestinationPath "$output_dir" -Force
           
-          # After extraction, headers are usually in a subdirectory like opus-1.5.2/include/opus
-          # Finds the actual name of the extracted directory (e.g., opus-1.5.2)
-          $extracted_dir = Get-ChildItem -Path $output_dir | Where-Object { $_.PSIsContainer -and $_.Name -like "opus-*" } | Select-Object -ExpandProperty Name | Select-Object -First 1
-          if (-not $extracted_dir) {
-            Write-Error "Could not find extracted Opus directory inside opus_sdk. Check the downloaded zip content."
+          # After extraction, headers are typically in a subdirectory like opus-tools/x64/include/opus or opus-tools/include/opus
+          # We'll check common paths. The headers might be directly under 'include/opus' within the zip.
+          $header_path_candidate1 = Join-Path $output_dir "opus-tools\x64\include\opus" # Common path for 64-bit builds
+          $header_path_candidate2 = Join-Path $output_dir "include\opus" # If headers are at the root of the zip's include directory
+
+          $opus_include_path = $null
+          if (Test-Path $header_path_candidate1) {
+            $opus_include_path = Resolve-Path $header_path_candidate1
+          } elseif (Test-Path $header_path_candidate2) {
+            $opus_include_path = Resolve-Path $header_path_candidate2
+          } else {
+            Write-Error "Could not find Opus headers (include/opus) in the extracted SDK. Please verify the structure of the downloaded zip."
             exit 1
           }
+          
           # Sets an environment variable with the path to the extracted include/opus directory
-          echo "OPUS_INCLUDE_PATH=$(Resolve-Path "$output_dir\$extracted_dir\include\opus")" | Out-File -FilePath $env:GITHUB_ENV -Append
+          echo "OPUS_INCLUDE_PATH=$opus_include_path" | Out-File -FilePath $env:GITHUB_ENV -Append
         shell: powershell
 
       # Step 4: Compresses build artifacts (MODIFIED to include .h headers)
